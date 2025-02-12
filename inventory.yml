@@ -1,0 +1,102 @@
+debian:
+  children:
+    grafana:
+      children:
+        loki:
+          hosts:
+            192.168.30.61:
+              name: grafana-loki
+              username: loki
+              access_key_id: #{LOKI_MINIO_ACCESS}
+              secret_access_key: #{LOKI_MINIO_SECRET}
+        tempo:
+          hosts:
+            192.168.30.62:
+              name: grafana-tempo
+    vmcluster:
+      children:
+        vmagent:
+          hosts:
+            192.168.30.31:
+              name: vmagent01
+        vmauth:
+          hosts:
+            192.168.30.50:
+              name: vmlb
+              role: vmauth,vminsert,vmselect
+        vmstorage:
+          hosts:
+            192.168.30.51:
+              name: victoriametrics01
+              role: vmstorage
+            192.168.30.52:
+              name: victoriametrics02
+              role: vmstorage
+            192.168.30.53:
+              name: victoriametrics03
+              role: vmstorage
+    syslog:
+      hosts:
+        192.168.30.60:
+          name: syslog01
+    minio:
+      hosts:
+        192.168.30.41:
+          name: minio01
+        192.168.30.42:
+          name: minio02
+        192.168.30.43:
+          name: minio03
+      vars:
+        vip: 192.168.30.6
+        MINIO_PATH: ["/mnt/disk1","/mnt/disk2","/mnt/disk3"]
+        
+    database:
+      hosts:
+        192.168.31.11:
+          name: db01
+    loadbalancers:
+      hosts:
+        192.168.30.4:
+          name: halb01
+          vrrp_inst: {
+            vip1: { 
+              state: MASTER,
+              interface: eth0,
+              router_id: 11,
+              priority: 200,
+              virtual_ipaddress: {
+                192.168.30.6/24
+              }
+            }
+          }
+        192.168.30.5:
+          name: halb02
+          vrrp_inst: {
+            vip1: { 
+              state: BACKUP,
+              interface: eth0,
+              router_id: 11,
+              priority: 100,
+              virtual_ipaddress: {
+                192.168.30.6/24
+              }
+            },
+          }
+      vars:
+        ha: no
+        notification_emails: #{EMAIL_LIST}
+    domain:
+      hosts:
+        192.168.30.21:
+          name: ipa01
+          os: 'rhel'
+    mini-pc:
+      hosts:
+        192.168.0.94:
+          name: mini01
+
+  vars:
+    domain: #{DOMAIN}
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+    technitium_token: #{TECHNITIUM_TOKEN}

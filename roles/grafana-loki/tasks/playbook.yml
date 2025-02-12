@@ -1,0 +1,53 @@
+---
+- name: Install Grafana Loki
+  become: true
+  hosts: loki
+  collections:
+    - grafana.grafana
+  roles:
+    - grafana.grafana.loki
+  vars:
+    loki_working_path: /loki
+    loki_common:
+      instance_addr: 127.0.0.1
+      path_prefix: "{{ loki_working_path }}"
+      storage:
+        s3: 
+          s3: {{ S3_BUCKET_URL }}
+          region: {{ S3_REGION }}
+          s3forcepathstyle: true
+          bucketnames: {{ S3_BUCKET }}
+          access_key_id: #{LOKI_MINIO_ACCESS}
+          secret_access_key: #{LOKI_MINIO_SECRET}
+      replication_factor: 1
+      ring:
+        kvstore:
+          store: inmemory
+    loki_schema_config:
+      configs:
+        - from: 2020-10-24
+          store: tsdb
+          object_store: s3
+          schema: v13
+          index:
+            prefix: index_
+            period: 24h
+    loki_compactor:
+      working_directory: /loki/retention
+      compaction_interval: 10m
+      retention_enabled: true
+      retention_delete_delay: 2h
+      retention_delete_worker_count: 150
+      delete_request_store: "aws"
+      delete_request_store_key_prefix: "index/"
+    loki_limits_config: 
+      retention_period: 24h
+    loki_storage_config:
+      aws:
+        s3: {{ S3_BUCKET_URL }}
+        bucketnames: {{ S3_BUCKET }}
+        region: {{ S3_REGION }}
+        access_key_id: #{LOKI_MINIO_ACCESS}
+        secret_access_key: #{LOKI_MINIO_SECRET}
+        insecure: true
+        s3forcepathstyle: true

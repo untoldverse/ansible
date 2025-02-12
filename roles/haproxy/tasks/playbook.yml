@@ -1,0 +1,80 @@
+---
+ - name: HAProxy Playbook 3.1
+   hosts: loadbalancers
+   tasks:
+    - name: Prepare sysctl settings
+      copy:
+        src: 50-haproxy-sysctl.conf
+        dest: /etc/sysctl.d/50-haproxy-sysctl.conf
+
+    - name: Enable sysctl settings
+      shell: sysctl -p /etc/sysctl.d/50-haproxy-sysctl.conf
+
+    - name: Add HAProxy 3.1 Repo
+      deb822_repository:
+        name: haproxy-3.1
+        types: deb
+        uris: http://haproxy.debian.net
+        components: main
+        suites: bookworm-backports-3.1
+        architectures: amd64
+        signed_by: https://haproxy.debian.net/bernat.debian.org.gpg
+        trusted: true
+
+    - name: Check if HAProxy is installed 
+      apt:
+        state: present
+        update_cache: true
+        name: haproxy=3.1.*
+    - name: Copy HAProxy Configs
+      template:
+        src: haproxy.cfg.j2
+        dest: /etc/haproxy/haproxy.cfg
+        owner: root
+        group: root
+        mode: '0644'
+      register: haproxy
+    - name: Copy HAProxy ENV file
+      template:
+        src: haproxy.j2
+        dest: /etc/default/haproxy
+        owner: root
+        group: root
+        mode: '0644'
+      register: haproxy_env
+    - name: Check if HAProxy is running
+      systemd:
+        name: haproxy
+        enabled: true
+        state: started
+    - name: Reload HAProxy upon config change
+      systemd:
+        name: haproxy
+        state: reloaded
+      when: haproxy['changed'] and haproxy_env['changed'] | bool
+    - name: Check if keepalived is installed
+      apt:
+        state: present
+        name: keepalived
+      when: ha | bool
+
+    - name: Setup keepalived
+      template:
+        src: keepalived.conf.j2
+        dest: /etc/keepalived/keepalived.conf
+        mode: '0644'
+        owner: root
+        group: root
+      register: keepalived
+    - name: Stop keepalived
+      systemd:
+        name: keepalived
+        enabled: false
+        state: stopped
+    #- name: Reload keepalived upon config change
+    #  systemd:
+    #    name: keepalived
+    #    state: reloaded
+    #  when: keepalived | bool
+
+

@@ -1,0 +1,40 @@
+- name: Install Minio
+  become: true
+  tasks:
+    - name: Minio service accounts
+      user:
+        name: "{{ MINIO_SERVICE_ACCOUNT }}"
+        state: present
+        system: true
+
+    - name: Check if minio is installed
+      apt:
+        name: minio
+        state: present
+      register: installed
+      ignore_errors: true
+    
+    - name: Install Minio
+      when: installed is failed
+      apt:
+        deb: https://dl.min.io/server/minio/release/linux-amd64/archive/minio_20241107005220.0.0_amd64.deb
+        
+    
+    - name: Update Configs
+      template:
+        src: minio.j2
+        dest: /etc/default/minio
+    - name: Ensure minio owns data path
+      ansible.builtin.file:
+        path: "{{ item| default('/mnt/disk1') }}"
+        owner: "{{ MINIO_SERVICE_ACCOUNT }}"
+        group: "{{ MINIO_SERVICE_ACCOUNT }}"
+        mode: '0764'
+      loop: "{{ MINIO_PATH }}"
+    - name: Ensure minio is running
+      systemd:
+        name: minio
+        enabled: true
+        state: restarted
+
+

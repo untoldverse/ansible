@@ -1,0 +1,5 @@
+
+MINIO_SERVICE_ACCOUNT: minio-user
+MINIO_ROOT_USER: "default-admin"
+MINIO_ROOT_PASSWORD: "defaultsupersecret"
+MINIO_VOLUMES: "/data" #If cluster, use http format and go expansion ie. {1..3}

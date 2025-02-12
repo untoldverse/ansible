@@ -1,0 +1,111 @@
+---
+- name: Generate CA Certificates
+  become: false
+  hosts: localhost
+  tasks:
+    - name: Check if CA key is generated
+      stat:
+        path: ./ca.key
+      register: ca_exists
+    - name: Generate CA key
+      when: not ca_exists.stat.exists
+      shell: openssl genrsa -out ca.key 2048
+    - name: Generate CA Cert
+      when: not ca_exists.stat.exists
+      shell: openssl req -x509 -new -nodes -key ca.key -subj "/CN=mommers-ca" -days 7300 -out ca.crt
+
+
+
+- name: Genearte Node Certificates
+  become: true
+  tasks:
+    - name: Create working directory
+      file:
+        path: /etc/certs
+        state: directory
+        mode: '0600'
+        owner: root
+        group: root
+
+    - name: Check if Key already exists
+      stat:
+        path: /etc/certs/node.key
+      register: key_exists
+    - name: Check if cert already exists
+      stat:
+        path: /etc/certs/node.crt
+      register: cert_exists
+    - name: Check if ca is already uploaded
+      stat:
+        path: /etc/certs/ca.crt
+      register: ca_cert_exists 
+    - name: Create Node Key
+      shell: openssl genrsa -out /etc/certs/node.key 2048
+      when: not key_exists.stat.exists
+    
+    - name: Create Cert Config Template
+      when: not cert_exists.stat.exists
+      template:
+        src: node.cnf.j2
+        dest: /etc/certs/node.cnf
+    - name: Generate CSR
+      when: not cert_exists.stat.exists
+      shell: openssl req -new -key /etc/certs/node.key -out /etc/certs/{{ ansible_hostname }}.csr -subj "/C=US/ST=Texas/L=Dallas/O=Mommers.us/CN={{ ansible_hostname }}" -config /etc/certs/node.cnf
+    
+    - name: Fetch CSR to ansible_controller
+      when: not cert_exists.stat.exists
+      fetch: 
+        src: /etc/certs/{{ansible_hostname}}.csr
+        dest: ./{{ ansible_hostname }}.csr
+        flat: true
+
+    - name: Fetch CNF to ansible_controller
+      when: not cert_exists.stat.exists
+      fetch: 
+        src: /etc/certs/node.cnf
+        dest: ./{{ ansible_hostname }}.cnf
+        flat: true
+
+    - name: Sign CSRs
+      become: false
+      when: not cert_exists.stat.exists
+      delegate_to: localhost
+      shell: openssl x509 -req -in {{ansible_hostname}}.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out {{ansible_hostname}}.crt -days 7300 -sha256 -extensions v3_req -extfile {{ansible_hostname}}.cnf
+
+    - name: Copy Signed cert to node
+      when: not cert_exists.stat.exists
+      copy:
+        src: ./{{ansible_hostname}}.crt
+        dest: /etc/certs/node.crt
+    
+    - name: Upload CA certificate(s)
+      when: not ca_cert_exists.stat.exists
+      copy:
+        src: ca.crt
+        dest: /etc/certs/ca.crt
+
+    - name: Cleanup CSR on nodes
+      file:
+        path: /etc/certs/{{ansible_hostname}}.csr
+        state: absent
+    
+    - name: Cleanup CSR on controller
+      become: false
+      delegate_to: localhost
+      file:
+        path: ./{{ansible_hostname}}.csr
+        state: absent
+    - name: Cleanup CNR
+      become: false
+      delegate_to: localhost
+      file:
+        path: ./{{ansible_hostname}}.cnf
+        state: absent
+  
+    - name: Cleanup CRT
+      become: false
+      delegate_to: localhost
+      file:
+        path: ./{{ansible_hostname}}.crt
+        state: absent
+

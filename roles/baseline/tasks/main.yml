@@ -1,0 +1,38 @@
+- name: OS Hardening via DevSec Harding
+  become: true
+  collections:
+    - devsec.hardening
+  pre_tasks:
+    - name: Enforce SSH Banner is applied
+      copy:
+        src: banner
+        dest: /etc/ssh/banner
+    - name: Enforce Issue is set
+      copy:
+        src: issue
+        dest: /etc/issue
+    - name: Remove MOTD
+      file:
+        path: /etc/motd
+        state: absent
+  post_tasks:
+    - name: Update APT System
+      when: ansible_facts['os_family'] == 'Debian' | ansible_facts['os_family'] == 'Ubuntu'
+      apt:
+        name: "*"
+        update_cache: true
+        state: latest
+    - name: Update DNF Systems
+      when: ansible_facts['os_family'] == 'rhel' || ansible_facts['os_family'] == 'rocky'
+      dnf:
+        name: "*"
+        update_cache: true
+        state: latest
+  roles:
+    - devsec.hardening.os_hardening
+    - devsec.hardening.ssh_hardening
+  vars:
+    ssh_banner: true
+    ssh_banner_path: /etc/ssh/banner
+
+      

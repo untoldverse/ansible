@@ -1,0 +1,35 @@
+! Configuration File for keepalived
+
+global_defs {
+   notification_email {
+     {% for email in notification_emails %}
+        {{ email }}
+     {% endfor %}
+   }
+   notification_email_from {{ ansible_hostname }}
+   router_id {{ ansible_hostname }}
+}
+
+
+{% for vrrp in vrrp_inst %}
+
+vrrp_instance {{ vrrp }} {
+    state {{ vrrp_inst[vrrp].state }}
+    interface {{ vrrp_inst[vrrp].interface }}
+    virtual_router_id {{ vrrp_inst[vrrp].router_id }}
+    priority {{ vrrp_inst[vrrp].priority }}
+    advert_int 1
+    authentication {
+        auth_type PASS
+        auth_pass {{ auth_pass | default('changeme') }}
+    }
+    virtual_ipaddress {
+    {% for vip in vrrp_inst[vrrp].virtual_ipaddress %}
+        {{ vip }}
+    {% endfor %}
+
+    }
+}
+{%- endfor %}
+
+
